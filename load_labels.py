@@ -7,26 +7,27 @@ def VOCDataset():
 	#code to download the dataset
 	download = os.path.exists('./data/VOCtrainval_06-Nov-2007.tar')
 	transform = torchvision.transforms.Compose(
-    [torchvision.transforms.Resize((448, 448)),
+    [torchvision.transforms.Resize((448, 448), interpolation=2),
      torchvision.transforms.ToTensor(),
-     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
+     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+])
 
 	trainset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
                                              image_set='train',
-                                        download=download, transforms=prepare_labels(448, transform))
+                                        download=download, transforms=transform_labels(448, transform))
 	trainloader = torch.utils.data.DataLoader(trainset, batch_size=64,
                                           shuffle=True, num_workers=2)
 
 	testset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
                                              image_set='val',
-                                       download=download, transforms=prepare_labels(448, transform))
+                                       download=download, transforms=transform_labels(448, transform))
 	testloader = torch.utils.data.DataLoader(testset, batch_size=4,
                                          shuffle=False, num_workers=2)
 	return trainloader, testloader
 
 #make a transform class to transform the voc json labels 
 #to	bounding box tensors 
-class prepare_labels(object):
+class transform_labels(object):
 	'''reshapes the boudning box coordinates in coordination with the input image
   Args:
       image_size(int, tuple) accepts int or tuple of ints: image shape and width

@@ -6,4 +6,5 @@ from yolov1 import yolonet
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 net = yolonet()
 net = net.to(device)
-print(summary(net, (3,448,448)))
+print(summary(net, (3,448,448))
+
