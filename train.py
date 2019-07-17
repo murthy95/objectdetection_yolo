@@ -11,6 +11,8 @@ def train(**kwargs):
 	net = net.to(device)
 	print(summary(net, (3,448,448))
 	
+	loss = yolov1loss()
+	opt = nn.optim.AdamOptimizer(parameters=net.params)
 	traindata, valdata = VOCDataset()
 	train_loss, train_acc, val_loss, val_acc = [],[],[],[]
 	for _ in range(kwargs[n_epochs]):
@@ -20,7 +22,14 @@ def train(**kwargs):
 			x = x.to(device)
 			y = y.to(device)
 			y_hat = net(x)
-			box1, box2, logits = torch.split(y_hat, [5, 5, 20], axis=1)
+			loss_ = loss(y_hat, y)
+			opt.zero_grad()
+			loss_.backward()
+			opt.step()
+		except:
+			continue
+		
+			 
 			
 		
 	
