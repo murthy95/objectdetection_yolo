@@ -12,23 +12,41 @@ def train(**kwargs):
 	print(summary(net, (3,448,448))
 	
 	loss = yolov1loss()
-	opt = nn.optim.AdamOptimizer(parameters=net.params)
+	optimizer = torch.optim.Adam(net.parameters())
 	traindata, valdata = VOCDataset()
-	train_loss, train_acc, val_loss, val_acc = [],[],[],[]
-	for _ in range(kwargs[n_epochs]):
+	train_loss, val_loss= [], []
+	for i in range(kwargs[n_epochs]):
 		trianiter = iter(traindata)
+		net.train()
 		try:
 			x, y = trainiter.next()
 			x = x.to(device)
 			y = y.to(device)
 			y_hat = net(x)
 			loss_ = loss(y_hat, y)
-			opt.zero_grad()
+			train_loss.append(loss_.data[0])
+			optimizer.zero_grad()
 			loss_.backward()
-			opt.step()
+			optimizer.step()
 		except:
-			continue
-		
+			print('training loss after {}/{} epochs is {}'.format(i+1, kwargs[n_epochs], torch.mean(train_loss[-len(trainiter):])))	
+
+		if i % kwargs[val_frequency] == 0:
+			valiter = iter(valdata)
+			net.eval()
+			with torch.no_grad():
+				try:
+					x, y = valiter.next()
+					x = x.to(device)
+					y = y.to(device)
+					y_hat = net(x)
+					loss_ = loss(y_hat, y)
+					val_loss.append(loss_.data[0])
+				except:
+					print('validation loss after {}/{} epochs is {}'.format(i+1, kwargs[n_epochs], torch.mean(val_loss[-len(valiter):])))	
+			
+if __name__ == '__main__':
+	train(**kwargs) 
 			 
 			
 		
