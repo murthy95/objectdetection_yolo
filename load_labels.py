@@ -3,7 +3,7 @@ import os
 import torchvision
 
 #Download script
-def VOCDataset():
+def VOCDataset(train_batch_size, test_batch_size):
 	#code to download the dataset
 	download = os.path.exists('./data/VOCtrainval_06-Nov-2007.tar')
 	transform = torchvision.transforms.Compose(
@@ -15,13 +15,13 @@ def VOCDataset():
 	trainset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
                                              image_set='train',
                                         download=download, transforms=transform_labels(448, transform))
-	trainloader = torch.utils.data.DataLoader(trainset, batch_size=64,
+	trainloader = torch.utils.data.DataLoader(trainset, batch_size=train_batch_size,
                                           shuffle=True, num_workers=2)
 
 	testset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
                                              image_set='val',
                                        download=download, transforms=transform_labels(448, transform))
-	testloader = torch.utils.data.DataLoader(testset, batch_size=4,
+	testloader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size,
                                          shuffle=False, num_workers=2)
 	return trainloader, testloader
 
@@ -72,7 +72,7 @@ class transform_labels(object):
 		except:
 			transformed_box = self.return_transformed_box(objects)
 			transformed_boxes[int(transformed_box[0]*7), int(transformed_box[1]*7)] = transformed_box
-		return self.transform(img), transformed_boxes
+		return self.transform(img), transformed_boxes.permute(2,0,1)
     
 	def return_transformed_box(self, obj):
 		class_id = self.class_dict[obj['name']]
