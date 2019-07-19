@@ -1,6 +1,7 @@
 import torch
 from torchsummary import summary
 import numpy as np
+from tqdm import tqdm 
 
 from yolov1 import yolonet
 from load_labels import VOCDataset
@@ -38,34 +39,32 @@ def train(argv):
 	for i in range(FLAGS.n_epochs):
 		trainiter = iter(traindata)
 		net.train()
-		try:
+		for _ in tqdm(range(len(trainiter)), ncols=50):
 			x, y = trainiter.next()
 			x = x.to(device)
 			y = y.to(device)
 			y_hat = net(x)
-			print(y_hat.shape)
 			loss_ = loss(y_hat, y)
 			train_loss.append(loss_.item())
 			optimizer.zero_grad()
 			loss_.backward()
 			optimizer.step()
-		except StopIteration:
-			print('training loss after {}/{} epochs is {}'.format(i+1, FLAGS.n_epochs, np.mean(train_loss[-len(trainiter):])))	
-
+ 		  
+		print('training loss after {}/{} epochs is {}'.format(i+1, FLAGS.n_epochs, np.mean(train_loss[-len(trainiter):])))	
 		if i % FLAGS.val_frequency == 0:
 			valiter = iter(valdata)
 			net.eval()
 			with torch.no_grad():
-				try:
+				for _ in tqdm(range(len(valiter)), ncols=50):
 					x, y = valiter.next()
 					x = x.to(device)
 					y = y.to(device)
 					y_hat = net(x)
 					loss_ = loss(y_hat, y)
-					val_loss.append(loss_.data[0])
-				except StopIteration:
-					print('validation loss after {}/{} epochs is {}'.format(i+1, FLAGS.n_epochs, np.mean(val_loss[-len(valiter):])))	
-			
+					val_loss.append(loss_.item())
+					
+				print('validation loss after {}/{} epochs is {}'.format(i+1, FLAGS.n_epochs, np.mean(val_loss[-len(valiter):])))
+				
 if __name__ == '__main__':
 	from absl import app
 	app.run(train)
