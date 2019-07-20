@@ -15,7 +15,7 @@ class conv_layer(nn.Module):
 	def forward(self, x):
 		x = self.conv(x)
 		x = self.bn(x)
-		return F.relu(x)
+		return F.leaky_relu(x, negative_slope=0.1)
 
 class conv_pool_block(nn.Module):
   def __init__(self, kernel_sizes, in_maps, out_maps, n_repeat, pooling=False, conv_layer=conv_layer):
