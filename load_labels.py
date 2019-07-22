@@ -3,26 +3,34 @@ import os
 import torchvision
 
 #Download script
-def VOCDataset(train_batch_size, test_batch_size):
+def VOCDataset(train_batch_size, val_batch_size, rank=None, size=None):
 	#code to download the dataset
 	download = os.path.exists('./data/VOCtrainval_06-Nov-2007.tar')
 	transform = torchvision.transforms.Compose(
-    [torchvision.transforms.Resize((448, 448), interpolation=2), torchvision.transforms.ToTensor(),
-     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    [torchvision.transforms.Resize((448, 448), interpolation=2), 
+		torchvision.transforms.ToTensor()
+		#torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+		#										 std=[0.229, 0.224, 0.225])
 ])
 
 	trainset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
                                              image_set='train',
                                         download=download, transforms=transform_labels(448, transform))
-	trainloader = torch.utils.data.DataLoader(trainset, batch_size=train_batch_size,
-                                          shuffle=True, num_workers=2)
-
-	testset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
+	valset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
                                              image_set='val',
                                        download=download, transforms=transform_labels(448, transform))
-	testloader = torch.utils.data.DataLoader(testset, batch_size=test_batch_size,
+	if not size==None:
+		trainset.images = trainset.images[rank * len(trainset) // size : (rank + 1)*len(trainset) // size]
+		trainset.annotations = trainset.annotations[rank * len(trainset) // size : (rank + 1)*len(trainset) // size]
+		
+		valset.images = valset.images[rank * len(valset) // size : (rank + 1)*len(valset) // size]
+		valset.annotations = valset.annotations[rank * len(valset) // size : (rank + 1)*len(valset) // size]
+
+	trainloader = torch.utils.data.DataLoader(trainset, batch_size=train_batch_size,
+                                          shuffle=True, num_workers=2)
+	valloader = torch.utils.data.DataLoader(valset, batch_size=val_batch_size,
                                          shuffle=False, num_workers=2)
-	return trainloader, testloader
+	return trainloader, valloader
 
 #make a transform class to transform the voc json labels 
 #to	bounding box tensors 
