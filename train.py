@@ -45,7 +45,7 @@ def train(argv):
 	#print(summary(net, (3,448,448)))
 	
 	loss = yolov1loss(lambda_coord=0.5, lambda_noobj=0.5, device=device)
-	optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+	optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
 	epoch = 0
 
 	if FLAGS.resume_train or not FLAGS.train:
@@ -99,7 +99,7 @@ def train(argv):
 		          'epoch': i + 1,
 		          'model_state_dict': net.state_dict(),
 		          'optimizer_state_dict': optimizer.state_dict()
-		          }, 'chkpt_files/yolov1_model_sgd.pth')	
+		          }, 'chkpt_files/yolov1_model_sgd_stage2.pth')	
 		
 			with open('chkpt_files/training_loss.txt', 'wb') as f:
 				pickle.dump(train_loss, f)
@@ -184,9 +184,9 @@ def main(argv):
 					
 if __name__ == '__main__':
 	from absl import app
-#	app.run(train)
-	multiprocessing.set_start_method('spawn')
-	app.run(main)			 
+	app.run(train)
+	#multiprocessing.set_start_method('spawn')
+	#app.run(main)			 
 			
 		
 	
