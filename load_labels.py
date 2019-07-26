@@ -13,10 +13,10 @@ def VOCDataset(train_batch_size, val_batch_size, rank=None, size=None):
 		#										 std=[0.229, 0.224, 0.225])
 ])
 
-	trainset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
+	trainset = torchvision.datasets.CocoDetection(root='./data', year='2007', 
                                              image_set='train',
                                         download=download, transforms=transform_labels(448, transform))
-	valset = torchvision.datasets.VOCDetection(root='./data', year='2007', 
+	valset = torchvision.datasets.CocoDetection(root='./data', year='2007', 
                                              image_set='val',
                                        download=download, transforms=transform_labels(448, transform))
 	if not size==None:
@@ -75,10 +75,17 @@ class transform_labels(object):
 		try:
 			for obj in list(objects):
 				transformed_box =  self.return_transformed_box(obj)
-				transformed_boxes[int(transformed_box[0]*7), int(transformed_box[1]*7)] = transformed_box
+				coordx, coordy = int(transformed_box[0]*7), int(transformed_box[1]*7)
+				transformed_box[0] = transformed_box[0]*7) - int(transformed_box[0]*7))
+				transformed_box[1] = transformed_box[1]*7) - int(transformed_box[1]*7))
+				transformed_boxes[coordx, coordy] = transformed_box
 		except:
 			transformed_box = self.return_transformed_box(objects)
-			transformed_boxes[int(transformed_box[0]*7), int(transformed_box[1]*7)] = transformed_box
+			coordx, coordy = int(transformed_box[0]*7), int(transformed_box[1]*7)
+			transformed_box[0] = transformed_box[0]*7) - int(transformed_box[0]*7))
+			transformed_box[1] = transformed_box[1]*7) - int(transformed_box[1]*7))
+			transformed_boxes[coordx, coordy] = transformed_box
+
 		return self.transform(img), transformed_boxes.permute(2,0,1)
     
 	def return_transformed_box(self, obj):
