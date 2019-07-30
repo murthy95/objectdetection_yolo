@@ -37,9 +37,9 @@ class conv_pool_block(torch.nn.Module):
   def forward(self, x):
     return self.model(x)
     
-class yolonet(torch.nn.Module):
+class backbonenet(torch.nn.Module):
   def __init__(self):
-    super(yolonet, self).__init__()
+    super(backbonenet, self).__init__()
     self.model = torch.nn.Sequential(conv_layer(3, 64, 7,stride=2, padding=3),
                               torch.nn.MaxPool2d(2, stride=2), 
                               conv_pool_block([3], 64, [192], 1, pooling=True), 
@@ -58,13 +58,35 @@ class yolonet(torch.nn.Module):
                               conv_layer(1024, 1024, 3, stride=2, padding=1),
                               conv_pool_block([3, 3], 1024, 
                                   [1024, 1024], 1))
-    self.Linear1 = torch.nn.Linear(49*1024, 4096)
-    self.Linear2 = torch.nn.Linear(4096, 49*(n_boxes*5 + n_classes))
    
   def forward(self, x):
     x = self.model(x)
-    x = x.view(x.size(0), -1)
+    return x.view(x.size(0), -1)
+		
+
+class yolonet(torch.nn.Module):
+  def __init__(self, bbone=None):
+    super(yolonet, self).__init__()
+    if bbone is None:
+      self.backbone = backbonenet()
+    else :
+      self.backbone = bbone 
+    self.Linear1 = torch.nn.Linear(49*1024, 4096)
+    self.Linear2 = torch.nn.Linear(4096, 49*(n_boxes*5 + n_classes))
+
+  def forward(self, x):
+    x = self.backbone(x)
     x = self.Linear1(x)
     x = self.Linear2(x)
     return x.view((x.size(0), 30, 7, 7))
 
+class yolonet_classification(torch.nn.Module):
+  def __init__(self):	
+    super(yolonet_classification, self).__init__()
+    self.backbone = backbonenet() 
+    self.Linear = torch.nn.Linear(49*1024, 100)
+  
+  def forward(self, x):
+    x = self.backbone(x)
+    return self.Linear(x)
+	

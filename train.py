@@ -1,19 +1,23 @@
 import os
-import torch
-from torchsummary import summary
+from collections import OrderedDict
+
 import numpy as np
 from tqdm import tqdm 
 from absl import flags 
 import pickle
-import torch.distributed as dist
-from torch.multiprocessing import Process
-import torch.multiprocessing as multiprocessing
 
-from yolov1 import yolonet
+import torch
+import torch.distributed as dist
+import torch.multiprocessing as multiprocessing
+from multiprocessing import Process
+from torchsummary import summary
+
+from yolov1 import yolonet, backbonenet
 from load_labels import VOCDataset
 from yolov1loss import yolov1loss
 from utils import *
-
+	
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 FLAGS = flags.FLAGS
 
@@ -40,12 +44,19 @@ def train(argv):
 	device = 'cpu'
 	if FLAGS.gpu:
 		device = 'cuda' if torch.cuda.is_available() else 'cpu'
-	net = yolonet()
-	net = net.to(device)
-	#print(summary(net, (3,448,448)))
 	
-	loss = yolov1loss(lambda_coord=0.5, lambda_noobj=0.5, device=device)
-	optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+	if not FLAGS.resume_train:
+		net = load_pretrained_cf100()
+		#print(summary(net, (3,448,448)))
+	
+	if FLAGS.resume_train :
+		 net = yolonet()
+	
+	net = net.to(device)
+	net = torch.nn.DataParallel(net)#, device_ids=torch.arange(8))
+	loss = yolov1loss(lambda_coord=5, lambda_noobj=0.5, device=device)
+	optimizer = torch.optim.Adam(net.parameters(), lr=0.0001)
+	#optimizer = torch.optim.SGD(net.parameters(), lr=0.005, momentum=0.9, weight_decay=0.0005)
 	epoch = 0
 
 	if FLAGS.resume_train or not FLAGS.train:
@@ -94,20 +105,43 @@ def train(argv):
 					if not len(suppressed_preds[0]) == 0:
 						save_path = 'results/result_preds_e{}.png'.format(i + 1)
 						visualize_bbox(x[0].to('cpu'), suppressed_preds[0], save_path)
-			#saving model to checkpoint 
-			torch.save({
-		          'epoch': i + 1,
-		          'model_state_dict': net.state_dict(),
-		          'optimizer_state_dict': optimizer.state_dict()
-		          }, 'chkpt_files/yolov1_model_sgd_stage2.pth')	
+			
+			save_model(net, optimizer, i, 'chkpt_files/yolov1_model_adam_dp.pth')
 		
-			with open('chkpt_files/training_loss.txt', 'wb') as f:
-				pickle.dump(train_loss, f)
-			with open('chkpt_files/validation_loss.txt', 'wb') as f:
-				pickle.dump(val_loss, f)
-	
 	else:
 		plot_random_n_predictions(10, net, device)
+
+
+def load_pretrained_cf100():
+	#loading yolonet pretrained on cifar100 dataset
+	chkpt = torch.load('checkpoint.pth.tar')
+	state_dict = chkpt['state_dict']
+	new_state_dict = OrderedDict()
+	for k, v in state_dict.items():
+		if not k[7:15] == 'backbone':
+			continue
+		name = k[16:] # remove `module.`
+		new_state_dict[name] = v	
+	bbnet = backbonenet()
+	bbnet.load_state_dict(new_state_dict)
+	del chkpt
+	torch.cuda.empty_cache()
+	net = yolonet(bbnet)
+	return net
+
+def save_model(net, optimizer, i, path):
+	#saving model to checkpoint 
+	torch.save({
+	        'epoch': i + 1,
+	        'model_state_dict': net.state_dict(),
+	        'optimizer_state_dict': optimizer.state_dict()
+	        },	path)
+	
+#	with open('chkpt_files/training_loss.txt', 'wb') as f:
+#		pickle.dump(train_loss, f)
+#	with open('chkpt_files/validation_loss.txt', 'wb') as f:
+#		pickle.dump(val_loss, f)
+
 
 def plot_random_n_predictions(num, net, device):
 	traindata, valdata = VOCDataset(FLAGS.train_batch, FLAGS.val_batch)
@@ -121,7 +155,7 @@ def plot_random_n_predictions(num, net, device):
 		for i in range(len(suppressed_preds)):
 			print(suppressed_preds[i])
 			save_path = 'results/test_preds_{}.png'.format(i+1)
-			visualize_bbox(x[i].to('cpu'), suppressed_preds[i], save_path)
+			visualize_bbox_labels(x[i].to('cpu'), y[i].to('cpu'), suppressed_preds[i], save_path)
 
 			#preds = visualize_bbox(x[i].to('cpu'), suppressed_preds[i])
 			#trues = visualize_bbox(x[i].to('cpu'), y_hat[i].to('cpu'))
@@ -130,47 +164,7 @@ def plot_random_n_predictions(num, net, device):
 			#import matplotlib.pyplot as plt 
 			#plt.imsave(save_path, image)
 
-def run(rank, size):
-	import time
-	time.sleep(1)
-	torch.manual_seed(1234)
-	traindata, valdata = VOCDataset(FLAGS.train_batch, FLAGS.val_batch, rank, size)
-	device = torch.device("cuda:{}".format(rank))
-	net = yolonet()
-	net = net.to(device)
-	loss = yolov1loss(lambda_coord=0.5, lambda_noobj=0.5, device=device)
-	optimizer = torch.optim.SGD(net.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
 
-	for i in range(FLAGS.n_epochs):
-		trainiter = iter(traindata)
-		net.train()
-		epoch_loss = 0.0
-		for _ in range(len(trainiter)):
-			x, y = trainiter.next()
-			x, y = x.to(device), y.to(device)
-			y_hat = net(x)
-			loss_ = loss(y_hat, y)
-			epoch_loss += loss_.item()
-			optimizer.zero_grad()
-			loss_.backward()
-			average_gradients(net)
-			optimizer.step()
-	
-		print('Rank ', dist.get_rank(), ', epoch ',  i, ': ', epoch_loss / len(trainiter))
-	
-def init_processes(rank, size, fn, backend='gloo'):
-	""" Initialize the distributed environment. """
-	os.environ['MASTER_ADDR'] = '127.0.0.1'
-	os.environ['MASTER_PORT'] = '29500'
-	dist.init_process_group(backend, rank=rank, world_size=size)
-	fn(rank, size)
-
-def average_gradients(model):
-	size = float(dist.get_world_size())
-	for param in model.parameters():
-		dist.all_reduce(param.grad.data, op=dist.reduce_op.SUM)
-		param.grad.data /= size
-	
 def main(argv):
 	if FLAGS.distributed :
 		ngpus = torch.cuda.device_count()
@@ -180,15 +174,8 @@ def main(argv):
 			p.start()
 			processes.append(p)
 		for p in processes:
-			p.join()	
+			p.join()		
 					
 if __name__ == '__main__':
 	from absl import app
 	app.run(train)
-	#multiprocessing.set_start_method('spawn')
-	#app.run(main)			 
-			
-		
-	
-		
-
