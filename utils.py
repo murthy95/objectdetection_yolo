@@ -151,13 +151,13 @@ def IoU(bb1, bb2):
 	      center_x center_y width height
 	bb2 : bounding box 2 coordinates in the same order as bb1
 	'''
-	minx = min(bb1[0] - bb1[2] / 2, bb2[0] - bb2[2] / 2)
-	maxx = max(bb1[0] + bb1[2] / 2, bb2[0] + bb2[2] / 2)
-	miny = min(bb1[1] - bb1[3] / 2, bb2[1] - bb2[3] / 2)
-	maxy = max(bb1[1] + bb1[3] / 2, bb2[1] + bb2[3] / 2)
-	diffx = (maxx - minx) - (bb1[2] + bb2[2]) 
-	diffy = (maxy - miny) - (bb1[3] + bb2[3])
-	if diffx < 0  and diffy < 0 :
+	minx = max(bb1[0] - bb1[2] / 2, bb2[0] - bb2[2] / 2)
+	maxx = min(bb1[0] + bb1[2] / 2, bb2[0] + bb2[2] / 2)
+	miny = max(bb1[1] - bb1[3] / 2, bb2[1] - bb2[3] / 2)
+	maxy = min(bb1[1] + bb1[3] / 2, bb2[1] + bb2[3] / 2)
+	diffx = (maxx - minx) #- (bb1[2] + bb2[2]) 
+	diffy = (maxy - miny) #- (bb1[3] + bb2[3])
+	if diffx > 0  and diffy >  0 :
 		intersection = diffx * diffy
 		return intersection / (bb1[2] * bb1[3] + bb2[2] * bb2[3] - intersection) 
 	return 0
@@ -194,6 +194,7 @@ def non_max_suppression( predicted_tensor):
 				temp_boxes.append(box[i])
 		
 		box = sorted(temp_boxes, key=lambda a:a[-2])
+		box = box[::-1]
 		box_list = [[] for _ in range(20)]
 		for i in range(len(box)):
 			box_list[int(box[i][-1])].append(box[i]) 
@@ -204,7 +205,7 @@ def non_max_suppression( predicted_tensor):
 				del sorted_[0]
 				sorted_new = []
 				for i in range(len(sorted_)):
-					if not IoU(this_box, sorted_[i]) > FLAGS.iou_threshold:
+					if IoU(this_box, sorted_[i]) < FLAGS.iou_threshold:
 						sorted_new.append(sorted_[i])
 
 				sorted_ = sorted_new

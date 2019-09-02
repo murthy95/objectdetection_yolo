@@ -33,7 +33,7 @@ def flip(image, bboxes):
 		image = np.flip(image, 1)
 		bboxes[:,0] = image.shape[1] - bboxes[:, 0]
 		bboxes[:,2] = image.shape[1] - bboxes[:, 2]
-		temp = bboxes[:,0]
+		temp = np.copy(bboxes[:,0])
 		bboxes[:,0] = bboxes[:,2]
 		bboxes[:,2] = temp
 	else:
@@ -41,7 +41,7 @@ def flip(image, bboxes):
 		image = np.flip(image, 0)
 		bboxes[:,1] = image.shape[0] - bboxes[:, 1]
 		bboxes[:,3] = image.shape[0] - bboxes[:, 3]
-		temp = bboxes[:,1]
+		temp = np.copy(bboxes[:,1])
 		bboxes[:,1] = bboxes[:,3]
 		bboxes[:,3] = temp
 	return image, bboxes

@@ -48,15 +48,17 @@ def train(argv):
 	if not FLAGS.resume_train:
 		net = load_pretrained_cf100()
 		#print(summary(net, (3,448,448)))
-	
+#		net = yolonet()
+
 	if FLAGS.resume_train :
 		 net = yolonet()
 	
 	net = net.to(device)
 	net = torch.nn.DataParallel(net)#, device_ids=torch.arange(8))
 	loss = yolov1loss(lambda_coord=5, lambda_noobj=0.5, device=device)
-	optimizer = torch.optim.Adam(net.parameters(), lr=0.0001)
-	#optimizer = torch.optim.SGD(net.parameters(), lr=0.005, momentum=0.9, weight_decay=0.0005)
+	#optimizer = torch.optim.Adam(net.parameters(), lr=0.001)
+	optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+
 	epoch = 0
 
 	if FLAGS.resume_train or not FLAGS.train:
@@ -86,6 +88,14 @@ def train(argv):
  			  
 			print('training loss after {}/{} epochs is {}'.format(i + 1, epoch + FLAGS.n_epochs, np.mean(train_loss[-len(trainiter):])))	
 			
+			if i % FLAGS.result_frequency == 0:
+				net.eval()
+				with torch.no_grad():
+					suppressed_preds = non_max_suppression(y_hat[0].unsqueeze(0))
+					if not len(suppressed_preds[0]) == 0:
+						save_path = 'results/train_preds_e{}.png'.format(i + 1)
+						visualize_bbox(x[0].to('cpu'), suppressed_preds[0], save_path)
+			
 			if i % FLAGS.val_frequency == 0:
 				valiter = iter(valdata)
 				net.eval()
@@ -99,14 +109,16 @@ def train(argv):
 						
 					print('validation loss after {}/{} epochs is {}'.format(i + 1, epoch + FLAGS.n_epochs, np.mean(val_loss[-len(valiter):])))
 
+			
 			if i % FLAGS.result_frequency == 0:
+				net.eval()
 				with torch.no_grad():
 					suppressed_preds = non_max_suppression(y_hat[0].unsqueeze(0))
 					if not len(suppressed_preds[0]) == 0:
-						save_path = 'results/result_preds_e{}.png'.format(i + 1)
+						save_path = 'results/val_preds_e{}.png'.format(i + 1)
 						visualize_bbox(x[0].to('cpu'), suppressed_preds[0], save_path)
 			
-			save_model(net, optimizer, i, 'chkpt_files/yolov1_model_adam_dp.pth')
+			save_model(net, optimizer, i, 'chkpt_files/yolov1_model_adam_stage2.pth')
 		
 	else:
 		plot_random_n_predictions(10, net, device)

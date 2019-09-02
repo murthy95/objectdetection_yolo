@@ -9,7 +9,8 @@ class conv_layer(torch.nn.Module):
 		self.conv = torch.nn.Conv2d(in_maps, out_maps, kernel_size,\
 													 stride=stride, padding=padding )
 		self.bn = torch.nn.BatchNorm2d(out_maps)
-		
+		#self.dropout = torch.nn.Dropout2d(p=0.5)
+
 	def forward(self, x):
 		x = self.conv(x)
 		x = self.bn(x)

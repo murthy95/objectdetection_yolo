@@ -40,9 +40,9 @@ def VOCDataset(train_batch_size, val_batch_size, rank=None, size=None):
 
 	trainset = torch.utils.data.ConcatDataset([trainset_07, trainset_12])
 	trainloader = torch.utils.data.DataLoader(trainset, batch_size=train_batch_size,
-                                          shuffle=True, num_workers=2)
+                                          shuffle=True, num_workers=2, pin_memory=True)
 	valloader = torch.utils.data.DataLoader(valset, batch_size=val_batch_size,
-                                         shuffle=True, num_workers=2)
+                                         shuffle=True, num_workers=2, pin_memory=True)
 	return trainloader, valloader
 
 #make a transform class to transform the voc json labels 
